@@ -11,7 +11,7 @@ import json
 from path_utils import path_from_local_root
 
 
-NAME = # TODO: Please give your agent a NAME
+NAME = "Ellipses"
 
 class MyAgent(MyLSVMAgent):
     def setup(self):
@@ -23,7 +23,10 @@ class MyAgent(MyLSVMAgent):
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
         bids = {} 
-        ...
+        for g in min_bids:
+            if (min_bids[g] > valuations[g]):
+                continue
+            bids[g] = min_bids[g]
         return bids
 
     def regional_bidder_strategy(self): 
@@ -31,7 +34,10 @@ class MyAgent(MyLSVMAgent):
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
         bids = {} 
-        ...
+        for g in self.get_goods_in_proximity():
+            if (min_bids[g] > valuations[g]):
+                continue
+            bids[g] = min_bids[g]
         return bids
 
     def get_bids(self):
