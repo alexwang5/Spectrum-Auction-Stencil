@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 from collections import deque
 
 grid = np.zeros((3, 6))
@@ -30,21 +31,43 @@ def calc_proximity(center_x : int, center_y : int, undo: bool = False) -> None:
                     seen.add((nextX, nextY))
         n -= 1
 
-def bidder_dfs(num_bidders: int, inter_lists: list, joint_dist: list) -> None:
+def bidder_dfs(num_bidders: int, inter_lists: list, build: list) -> None:
     if (num_bidders == 0):
-        intersects = inter_lists
-
+        # report = frozenset(build)
+        # if (report not in seen):
+        #     seen.add(report)
+        for i in range(grid.shape[0]):
+            for j in range(grid.shape[1]):
+                inter_lists[i, j, int(grid[i, j])] += 1
     else:
         for i in range(grid.shape[0]):
             for j in range(grid.shape[1]):
                 calc_proximity(center_x=i, center_y=j)
-                inter_lists.append(list())
-                bidder_dfs(num_bidders - 1, inter_lists, joint_dist)
-                inter_lists.pop()
+                build.append((i, j))
+                bidder_dfs(num_bidders - 1, inter_lists, build)
+                build.pop()
                 calc_proximity(center_x=i, center_y=j, undo=True)
 
+def average_intersections(inter_lists: list, num_poss: int):
+    joint_dist = np.zeros((inter_lists.shape[0], inter_lists.shape[1]))
+    for i in range(inter_lists.shape[0]):
+        for j in range(inter_lists.shape[1]):
+            for k in range(inter_lists.shape[2]):
+                joint_dist[i, j] += k * (inter_lists[i, j, k] / num_poss)
+    return joint_dist
+
 def calc_distribution(num_bidders: int) -> list:
-    return list()
+    inter_lists = np.zeros((3, 6, num_bidders + 1))
+    bidder_dfs(num_bidders, inter_lists, list())
+    print(18 ** num_bidders)
+    joint_dist = average_intersections(inter_lists, 18 ** num_bidders)
+    return (inter_lists, joint_dist)
 
 if __name__ == "__main__":
-    calc_distribution(3)
+    inter_lists, joint_dist = calc_distribution(5)
+    print(inter_lists)
+    print("---------")
+    print(joint_dist)
+    print("---------")
+
+    
