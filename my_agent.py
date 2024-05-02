@@ -11,7 +11,8 @@ import json
 from collections import deque
 from path_utils import path_from_local_root
 
-NAME = "Ellipses"
+NAME = "idk"
+
 def comparator(e):
     return e["value"]
 
