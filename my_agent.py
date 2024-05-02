@@ -8,25 +8,136 @@ import os
 import random
 import gzip
 import json
+from collections import deque
 from path_utils import path_from_local_root
 
-
 NAME = "Ellipses"
+def comparator(e):
+    return e["value"]
 
 class MyAgent(MyLSVMAgent):
     def setup(self):
         #TODO: Fill out with anything you want to initialize each auction
-        pass 
+        #------Utility-------------#
+        self.goods_to_consider = {"A", "B", "C", "D", "E", "F", 
+                                  "G", "H", "I", "J", "K", "L", 
+                                  "M", "N", "O", "P", "Q", "R"}
+        self.index = [[chr(i + 65 + 6 * j) for i in range(6)] for j in range(3)]
+        #------For national--------#
+        self.border = {"A", "B", "C", "D", "E", "F", 
+                       "G",                     "L", 
+                       "M", "N", "O", "P", "Q", "R"}
+        self.BORDER_SHADE = 0.9
+        self.OUTER_SHADE = 0.7
+        self.GRACE_PERIOD = 5
+        self.counter = 0
+        #------For regional--------#
+        self.top_priority = set()
+        self.high_priority = set()
+        self.mid_priority = set()
+        self.low_priority = set()
+        self.TOP_SHADE = 0.9
+        self.HIGH_SHADE = 0.6
+        self.MID_SHADE = 0.4
+        self.LOW_SHADE = 0.3
+        self.TOP_SIZE = 3
+
+    def validate_coord(self, x, y):
+        return (x >= 0 and x < len(self.index)) and (y >= 0 and y < len(self.index[0]))
+    
+    def determine_priority(self, init_size):
+        if (self.is_national_bidder() or init_size > 5):
+            return
+        valuations = self.get_valuations()
+        coords = self.get_goods_to_index()
+
+        center = self.get_regional_good()
+        centerCoord = coords[center]
+        self.top_priority.add(center)
+
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        seen = set()
+        seen.add(centerCoord)
+        queue = deque()
+        if (init_size > 1):
+            init_size -= 1
+            to_add = []
+            for d in directions:
+                x = centerCoord[0] + d[0]
+                y = centerCoord[1] + d[1]
+                if (self.validate_coord(x, y)):
+                    to_add.append({"id": self.index[x][y], "value": valuations[self.index[x][y]]})
+                    seen.add((x, y))
+                    queue.append((x, y))
+            to_add.sort(key=comparator)
+            while (init_size > 0):
+                self.top_priority.add(to_add.pop()["id"])
+                init_size -= 1
+        
+        level = 0
+        while (len(queue) > 0):
+            n = len(queue)
+            for _ in range(n):
+                curr = queue.popleft()
+                if (level == 1):
+                    self.high_priority.add(self.index[curr[0]][curr[1]])
+                elif (level == 2):
+                    self.mid_priority.add(self.index[curr[0]][curr[1]])
+                elif (level == 3):
+                    self.low_priority.add(self.index[curr[0]][curr[1]])
+                for d in directions:
+                    x = curr[0] + d[0]
+                    y = curr[1] + d[1]
+                    if (self.validate_coord(x, y) and (x, y) not in seen):
+                        seen.add((x, y))
+                        queue.append((x, y))
+            if (level < 3):
+                level += 1
+
+    def marginal_value(self, good):
+        curr_alloc = set(self.goods_to_consider)
+        curr_value = self.calc_total_valuation(curr_alloc)
+        curr_alloc.discard(good)
+        return abs(curr_value - self.calc_total_valuation(curr_alloc))
     
     def national_bidder_strategy(self): 
         # TODO: Fill out with your national bidder strategy
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
-        bids = {} 
+        bids = {}
+        if len(self.goods_to_consider) <= 6:
+            # Rage quit
+            return bids
         for g in min_bids:
-            if (min_bids[g] > valuations[g]):
-                continue
-            bids[g] = min_bids[g]
+            if (g in self.goods_to_consider):
+                if (g in self.border):
+                    if (min_bids[g] > self.BORDER_SHADE * self.marginal_value(g)):
+                        self.goods_to_consider.discard(g)
+                        continue
+                else:
+                    if (self.counter >= self.GRACE_PERIOD):
+                        if (min_bids[g] > self.OUTER_SHADE * self.marginal_value(g)):
+                            self.goods_to_consider.discard(g)
+                            continue
+                    else:
+                        self.counter += 1
+                bids[g] = min_bids[g]
+        # for g in min_bids:
+        #     if (g in self.goods_to_consider):
+        #         if (g in self.border):
+        #             if (min_bids[g] > self.BORDER_SHADE * self.marginal_value(g)):
+        #                 self.goods_to_consider.discard(g)
+        #                 continue
+        #             bids[g] = self.BORDER_SHADE * self.marginal_value(g)
+        #         else:
+        #             if (self.counter >= self.GRACE_PERIOD):
+        #                 if (min_bids[g] > self.OUTER_SHADE * self.marginal_value(g)):
+        #                     self.goods_to_consider.discard(g)
+        #                     continue
+        #                 bids[g] = self.OUTER_SHADE * self.marginal_value(g)
+        #             else:
+        #                 self.counter += 1
+        #                 bids[g] = min_bids[g]
         return bids
 
     def regional_bidder_strategy(self): 
@@ -34,8 +145,17 @@ class MyAgent(MyLSVMAgent):
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
         bids = {} 
-        for g in self.get_goods_in_proximity():
-            if (min_bids[g] > valuations[g]):
+        for g in self.goods_to_consider:
+            shade = 1
+            if (g in self.top_priority):
+                shade = self.TOP_SHADE
+            elif (g in self.high_priority):
+                shade = self.HIGH_SHADE
+            elif (g in self.mid_priority):
+                shade = self.MID_SHADE
+            elif (g in self.low_priority):
+                shade = self.LOW_SHADE
+            if (min_bids[g] > shade * self.marginal_value(g)):
                 continue
             bids[g] = min_bids[g]
         return bids
@@ -44,6 +164,8 @@ class MyAgent(MyLSVMAgent):
         if self.is_national_bidder(): 
             return self.national_bidder_strategy()
         else: 
+            if (len(self.top_priority) == 0):
+                self.determine_priority(3)
             return self.regional_bidder_strategy()
     
     def update(self):
@@ -118,7 +240,7 @@ if __name__ == "__main__":
     ### DO NOT TOUCH THIS #####
     agent = MyAgent(NAME)
     arena = LSVMArena(
-        num_cycles_per_player = 3,
+        num_cycles_per_player = 1,
         timeout=1,
         local_save_path="saved_games",
         players=[
@@ -126,6 +248,8 @@ if __name__ == "__main__":
             MyAgent("CP - MyAgent"),
             MyAgent("CP2 - MyAgent"),
             MyAgent("CP3 - MyAgent"),
+            # MyAgent("CP4 - MyAgent"),
+            # MyAgent("CP5 - MyAgent"),
             MinBidAgent("Min Bidder"), 
             JumpBidder("Jump Bidder"), 
             TruthfulBidder("Truthful Bidder"), 
