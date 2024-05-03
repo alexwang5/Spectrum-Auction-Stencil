@@ -106,7 +106,7 @@ class MyAgent(MyLSVMAgent):
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
         bids = {}
-        if len(self.goods_to_consider) <= 6:
+        if len(self.goods_to_consider) <= 8:
             # Rage quit
             return bids
         for g in min_bids:
@@ -158,7 +158,11 @@ class MyAgent(MyLSVMAgent):
                 shade = self.LOW_SHADE
             if (min_bids[g] > shade * self.marginal_value(g)):
                 continue
-            bids[g] = min_bids[g]
+            if (self.counter == 0):
+                bids[g] = 0.9 * shade * self.marginal_value(g)
+                self.counter += 1
+            else:
+                bids[g] = min_bids[g]
         return bids
 
     def get_bids(self):
