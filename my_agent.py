@@ -42,6 +42,7 @@ class MyAgent(MyLSVMAgent):
         self.MID_SHADE = 0.5
         self.LOW_SHADE = 0.2
         self.TOP_SIZE = 3
+        self.max_price = dict()
 
     def validate_coord(self, x, y):
         return (x >= 0 and x < len(self.index)) and (y >= 0 and y < len(self.index[0]))
@@ -182,16 +183,29 @@ class MyAgent(MyLSVMAgent):
         #             self.counter += 1
         #         else:
         #             bids[g] = min_bids[g]
-        for g in min_bids:
-            if (g in self.goods_to_consider):
-                if (min_bids[g] > valuations[g]):
-                    self.goods_to_consider.discard(g)
-                    continue
-                if (self.counter == 0):
-                    bids[g] = 0.95 * valuations[g]
-                    self.counter += 1
-                else:
-                    bids[g] = min_bids[g]
+
+        # if len(self.goods_to_consider) <= 2:
+        #     return bids
+        # for g in min_bids:
+        #     if (g in self.goods_to_consider):
+        #         if (g in self.max_price):
+        #             if (min_bids[g] > self.max_price[g]):
+        #                 self.goods_to_consider.discard(g)
+        #                 self.top_priority.discard(g)
+        #                 continue
+        #         elif (min_bids[g] > valuations[g]):
+        #             self.goods_to_consider.discard(g)
+        #             continue
+        #         if (self.counter == 0):
+        #             bids[g] = 0.95 * valuations[g]
+        #             self.counter += 1
+        #         else:
+        #             bids[g] = min_bids[g]
+
+        if (self.counter == 0):
+            for g in self.get_goods_in_proximity():
+                bids[g] = 1.05 * valuations[g]
+            self.counter += 1
         return bids
 
     def get_bids(self):
@@ -200,6 +214,12 @@ class MyAgent(MyLSVMAgent):
         else: 
             if (len(self.top_priority) == 0):
                 self.determine_priority(3)
+                for g in self.top_priority:
+                    self.max_price[g] = 1.4 * self.get_valuations()[g]
+                    # init_value = self.calc_total_valuation(self.top_priority)
+                    # self.top_priority.discard(g)
+                    # self.max_price[g] = init_value - self.calc_total_valuation(self.top_priority)
+                    # self.top_priority.add(g)
             # if (self.counter == 0):
             #     self.goods_to_consider = set(self.get_goods_in_proximity())
             return self.regional_bidder_strategy()

@@ -6,6 +6,8 @@ __pycache__/
 *$py.class
 
 /saved_games/*.json.gz
+*.json
+saved_games/*
 
 # C extensions
 *.so
