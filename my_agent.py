@@ -37,10 +37,10 @@ class MyAgent(MyLSVMAgent):
         self.high_priority = set()
         self.mid_priority = set()
         self.low_priority = set()
-        self.TOP_SHADE = 0.9
-        self.HIGH_SHADE = 0.6
-        self.MID_SHADE = 0.4
-        self.LOW_SHADE = 0.3
+        self.TOP_SHADE = 1.2
+        self.HIGH_SHADE = 0.8
+        self.MID_SHADE = 0.5
+        self.LOW_SHADE = 0.2
         self.TOP_SIZE = 3
 
     def validate_coord(self, x, y):
@@ -106,11 +106,24 @@ class MyAgent(MyLSVMAgent):
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
         bids = {}
-        if len(self.goods_to_consider) <= 8:
+        total_val = 0
+        for g in self.goods_to_consider:
+            total_val += valuations[g]
+        bundle_val = self.calc_total_valuation(self.goods_to_consider)
+        if bundle_val / max(total_val, 1) <= 1.5:
             # Rage quit
+            self.goods_to_consider = set()
             return bids
         for g in min_bids:
             if (g in self.goods_to_consider):
+                # if (min_bids[g] > self.BORDER_SHADE * self.marginal_value(g)):
+                #     self.goods_to_consider.discard(g)
+                #     continue
+                # if (self.counter == 0):
+                #     bids[g] = self.OUTER_SHADE * self.BORDER_SHADE * self.marginal_value(g)
+                #     self.counter += 1
+                # else:
+                #     bids[g] = min_bids[g]
                 if (g in self.border):
                     if (min_bids[g] > self.BORDER_SHADE * self.marginal_value(g)):
                         self.goods_to_consider.discard(g)
@@ -146,23 +159,39 @@ class MyAgent(MyLSVMAgent):
         min_bids = self.get_min_bids()
         valuations = self.get_valuations() 
         bids = {} 
-        for g in self.goods_to_consider:
-            shade = 1
-            if (g in self.top_priority):
-                shade = self.TOP_SHADE
-            elif (g in self.high_priority):
-                shade = self.HIGH_SHADE
-            elif (g in self.mid_priority):
-                shade = self.MID_SHADE
-            elif (g in self.low_priority):
-                shade = self.LOW_SHADE
-            if (min_bids[g] > shade * self.marginal_value(g)):
-                continue
-            if (self.counter == 0):
-                bids[g] = 0.9 * shade * self.marginal_value(g)
-                self.counter += 1
-            else:
-                bids[g] = min_bids[g]
+        # for g in min_bids:
+        #     if (g in self.goods_to_consider):
+        #         shade = 1
+        #         if (g in self.top_priority):
+        #             shade = self.TOP_SHADE
+        #         elif (g in self.high_priority):
+        #             shade = self.HIGH_SHADE
+        #         elif (g in self.mid_priority):
+        #             shade = self.MID_SHADE
+        #         elif (g in self.low_priority):
+        #             shade = self.LOW_SHADE
+
+        #         # Remove good from goods to consider if too expensive
+        #         if (min_bids[g] > shade * self.marginal_value(g)):
+        #             self.goods_to_consider.discard(g)
+        #             continue
+                
+        #         # If it's the first round, immediately provide high bid, otherwise incremental until we reach highest
+        #         if (self.counter == 0):
+        #             bids[g] = max(0.9 * shade * self.marginal_value(g), valuations[g])
+        #             self.counter += 1
+        #         else:
+        #             bids[g] = min_bids[g]
+        for g in min_bids:
+            if (g in self.goods_to_consider):
+                if (min_bids[g] > valuations[g]):
+                    self.goods_to_consider.discard(g)
+                    continue
+                if (self.counter == 0):
+                    bids[g] = 0.95 * valuations[g]
+                    self.counter += 1
+                else:
+                    bids[g] = min_bids[g]
         return bids
 
     def get_bids(self):
@@ -171,6 +200,8 @@ class MyAgent(MyLSVMAgent):
         else: 
             if (len(self.top_priority) == 0):
                 self.determine_priority(3)
+            # if (self.counter == 0):
+            #     self.goods_to_consider = set(self.get_goods_in_proximity())
             return self.regional_bidder_strategy()
     
     def update(self):
